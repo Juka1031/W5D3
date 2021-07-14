@@ -12,7 +12,9 @@ include Singleton
 end
 
 class Users
+
     attr_accessor :id, :fname, :lname
+
     def self.all
         data = QuestionsDBConnection.instance.execute("SELECT * FROM users")
         data.map { |datum| Users.new(datum) }
@@ -47,17 +49,50 @@ class Users
         end
         Users.new(full_name[0])
     end
+
+    def create
+        raise "#{self} already in database" if self.id
+        QuestionsDBConnection.instance.execute(<<-SQL, self.fname, self.lname)
+          INSERT INTO
+            users (fname, lname)
+          VALUES
+            (?, ?)
+        SQL
+        self.id = QuestionsDBConnection.instance.last_insert_row_id
+      end
+
+      def update
+        raise "#{self} not in database" unless self.id
+        QuestionsDBConnection.instance.execute(<<-SQL, self.fname, self.lname, self.id)
+          UPDATE
+            users
+          SET
+            fname = ?, lname = ?
+          WHERE
+            id = ?
+        SQL
+      end
 end
 
 
 class Questions
-    attr_accessor :id, :title, :body, :author
+
+    attr_accessor :title, :body, :author, :id
+
+    def self.all
+        data = QuestionsDBConnection.instance.execute("SELECT * FROM questions")
+        data.map { |datum| Questions.new(datum) }
+    end
+
     def initialize(options)
         @id = options['id']
         @title = options['title']
         @body = options['body']
         @author = options['author']
-        
+    end
+
+    def authored_question
+
     end
 
     def self.find_by_id(id)
@@ -72,17 +107,65 @@ class Questions
         Questions.new(id_1[0])
     end
 
+    def self.find_by_author_id(author_id)
+        id_1 = QuestionsDBConnection.instance.execute(<<-SQL, author_id)
+        SELECT *
+        FROM questions
+        WHERE author = ?
+        SQL
+        if id_1.length == 0
+            return nil
+        end
+        id_1.map {|question| Questions.new(question)}
+    end
+
+    def self.find_by_question(title)
+        title_1 = QuestionsDBConnection.instance.execute(<<-SQL,("%"+title+"%"))
+        SELECT *
+        FROM questions
+        WHERE title like ?
+        SQL
+        if title_1.length == 0
+            return nil
+        end
+        Questions.new(title_1[0])
+    end
+
+    def create
+        raise "#{self} already in database" if self.id
+        QuestionsDBConnection.instance.execute(<<-SQL, self.title, self.body, self.author)
+          INSERT INTO
+            questions (title, body, author)
+          VALUES
+            (?, ?, ?)
+        SQL
+        self.id = QuestionsDBConnection.instance.last_insert_row_id
+      end
+
+      def update
+        raise "#{self} not in database" unless self.id
+        QuestionsDBConnection.instance.execute(<<-SQL, self.title, self.body, self.author, self.id)
+          UPDATE
+            questions
+          SET
+            title = ?, body = ?, author = ? 
+          WHERE
+            id = ?
+        SQL
+      end
+
 end
 
 class QuestionFollows
 
     attr_accessor :id, :followers, :question
+
     def initialize(options)
         @id = options['id']
         @followers = options['follower']
         @question = options['question']
-        
     end
+
     def self.find_by_id(id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, id)
         SELECT *
@@ -106,6 +189,7 @@ class Replies
         @parent = options['parent']
         @author = options['author']
     end
+
     def self.find_by_id(id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, id)
         SELECT *
@@ -116,6 +200,30 @@ class Replies
             return nil
         end
         Replies.new(id_1[0])
+    end
+
+    def self.find_by_id(user_id)
+        id_1 = QuestionsDBConnection.instance.execute(<<-SQL, user_id)
+        SELECT *
+        FROM replies
+        WHERE author = ?
+        SQL
+        if id_1.length == 0
+            return nil
+        end
+        id_1.map { |reply| Replies.new(reply)}
+    end
+
+    def self.find_by_id(question_id)
+        id_1 = QuestionsDBConnection.instance.execute(<<-SQL, question_id)
+        SELECT *
+        FROM replies
+        WHERE subj = ?
+        SQL
+        if id_1.length == 0
+            return nil
+        end
+        id_1.map { |reply| Replies.new(reply)}
     end
 
 end
