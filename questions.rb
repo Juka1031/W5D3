@@ -26,6 +26,18 @@ class Users
         @lname = options['lname']
     end
 
+    def authored_question
+        Questions.find_by_author_id(self.id)
+    end
+
+    def followed_questions
+        QuestionFollows.followed_questions_for_user_id(self.id)
+    end
+
+    def authored_replies
+        Replies.find_by_author_id(self.id)
+    end
+
     def self.find_by_id(id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, id)
         SELECT *
@@ -91,10 +103,6 @@ class Questions
         @author = options['author']
     end
 
-    def authored_question
-
-    end
-
     def self.find_by_id(id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, id)
         SELECT *
@@ -105,6 +113,19 @@ class Questions
             return nil
         end
         Questions.new(id_1[0])
+    end
+
+    def followers
+        QuestionFollows.followers_for_question_id(self.id)
+    end
+
+    def authored
+        author_1 = QuestionsDBConnection.instance.execute(<<-SQL, self.author)
+        SELECT *
+        FROM users
+        WHERE id = ?
+        SQL
+        Users.new(author_1[0])
     end
 
     def self.find_by_author_id(author_id)
@@ -142,7 +163,7 @@ class Questions
         self.id = QuestionsDBConnection.instance.last_insert_row_id
       end
 
-      def update
+    def update
         raise "#{self} not in database" unless self.id
         QuestionsDBConnection.instance.execute(<<-SQL, self.title, self.body, self.author, self.id)
           UPDATE
@@ -154,6 +175,10 @@ class Questions
         SQL
       end
 
+    def replies
+        Replies.find_by_question_id(self.id)
+    end
+
 end
 
 class QuestionFollows
@@ -164,6 +189,28 @@ class QuestionFollows
         @id = options['id']
         @followers = options['follower']
         @question = options['question']
+    end
+
+    def self.followers_for_question_id(question_id)
+        id_1 = QuestionsDBConnection.instance.execute(<<-SQL, question_id)
+        SELECT users.id, users.fname, users.lname
+        FROM questions 
+        JOIN question_follows ON questions.id = question
+        JOIN users ON question_follows.followers = users.id
+        WHERE questions.id = ?
+        SQL
+        id_1.map {|user| Users.new(user)}
+    end
+
+    def self.followed_questions_for_user_id(user_id)
+        id_1 = QuestionsDBConnection.instance.execute(<<-SQL, user_id)
+        SELECT questions.id, questions.title, questions.body, questions.author
+        FROM users
+        JOIN question_follows ON users.id = question_follows.followers
+        JOIN questions ON question_follows.question = questions.id
+        WHERE users.id = ?
+        SQL
+        id_1.map {|question| Questions.new(question)}
     end
 
     def self.find_by_id(id)
@@ -190,6 +237,46 @@ class Replies
         @author = options['author']
     end
 
+    def authored
+        author_1 = QuestionsDBConnection.instance.execute(<<-SQL, self.author)
+        SELECT *
+        FROM users
+        WHERE id = ?
+        SQL
+        Users.new(author_1[0])
+    end
+
+    def question
+        question = QuestionsDBConnection.instance.execute(<<-SQL, self.subj)
+        SELECT *
+        FROM questions
+        WHERE id = ?
+        SQL
+        Question.new(author_1[0])
+    end
+
+    def parent_reply
+        if parent == nil
+            self.question
+        end
+        reply = QuestionsDBConnection.instance.execute(<<-SQL, self.parent)
+        SELECT *
+        FROM replies
+        WHERE id = ?
+        SQL
+        Replies.new(reply[0])
+    end
+
+    def self.all
+        data = QuestionsDBConnection.instance.execute("SELECT * FROM replies")
+        data.map { |datum| Replies.new(datum) }
+    end
+    
+    def child_reply
+        children = Replies.all
+        children.select {|child| child.parent == self.id}
+    end
+
     def self.find_by_id(id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, id)
         SELECT *
@@ -202,7 +289,7 @@ class Replies
         Replies.new(id_1[0])
     end
 
-    def self.find_by_id(user_id)
+    def self.find_by_author_id(user_id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, user_id)
         SELECT *
         FROM replies
@@ -214,7 +301,7 @@ class Replies
         id_1.map { |reply| Replies.new(reply)}
     end
 
-    def self.find_by_id(question_id)
+    def self.find_by_question_id(question_id)
         id_1 = QuestionsDBConnection.instance.execute(<<-SQL, question_id)
         SELECT *
         FROM replies
