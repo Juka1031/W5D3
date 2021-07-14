@@ -52,4 +52,27 @@ CREATE TABLE question_likes (
 );
 
 
+INSERT INTO
+  users (fname, lname)
+VALUES
+  ('Dustin', 'Adler'),
+  ('Julian', 'Kang');
 
+INSERT INTO
+  questions (title, body, author)
+VALUES
+  ('WhyDoIExist', 'I think it''s self explanitory?', (SELECT id FROM users WHERE fname = 'Dustin' AND lname = 'Adler')),
+  ('Lunch?', 'What''s for lunch?', (SELECT id FROM users WHERE fname = 'Julian' AND lname ='Kang'));
+
+INSERT INTO
+  question_follows (followers, question)
+VALUES
+  ((SELECT id FROM users WHERE fname = 'Dustin' AND lname = 'Adler'),
+  (SELECT id FROM questions WHERE title = 'WhyDoIExist'));
+
+  INSERT INTO
+    replies (reply, subj, parent, author)
+  VALUES
+    ('EternalDamnation', (SELECT id FROM questions WHERE title = 'WhyDoIExist'),
+    (SELECT id FROM replies WHERE reply = 'EternalDamnation'),
+    (SELECT id FROM users WHERE fname = 'Dustin' AND lname = 'Adler'));
