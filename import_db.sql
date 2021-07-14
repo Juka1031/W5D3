@@ -70,9 +70,9 @@ VALUES
   ((SELECT id FROM users WHERE fname = 'Dustin' AND lname = 'Adler'),
   (SELECT id FROM questions WHERE title = 'WhyDoIExist'));
 
-  INSERT INTO
+INSERT INTO
     replies (reply, subj, parent, author)
-  VALUES
+VALUES
     ('EternalDamnation', (SELECT id FROM questions WHERE title = 'WhyDoIExist'),
     (SELECT id FROM replies WHERE reply = 'EternalDamnation'),
     (SELECT id FROM users WHERE fname = 'Dustin' AND lname = 'Adler'));
